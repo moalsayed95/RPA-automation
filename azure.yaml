@@ -1,0 +1,9 @@
+# Azure Developer CLI (azd) project configuration
+# Run `azd up` to provision infrastructure and deploy code
+name: rpa-logic-app-deployer
+
+services:
+  api:
+    project: ./function_app
+    host: function
+    language: python

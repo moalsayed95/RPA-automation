@@ -1,0 +1,5 @@
+{
+  "country": "testpoc",
+  "resourceGroup": "rg-<env-name>",
+  "subscriptionId": "<your-subscription-id>"
+}
