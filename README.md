@@ -1,6 +1,6 @@
 # RPA Logic App Deployer
 
-Azure Function that deploys parameterized Logic Apps via a REST API. Designed to be called from **Microsoft Copilot Studio** in Teams — a user provides a country name and the function creates a pre-configured Logic App in the target resource group.
+The RPA team needs to provision a dedicated Azure Logic App for every country/organization, a process that must scale to 100+ deployments but is currently manual, slow, and error-prone. This project replaces that workflow with an Azure Function that deploys fully parameterized Logic Apps via ARM templates, triggered by a simple REST call. A **Microsoft Copilot Studio** agent in Teams provides the conversational front-end — a user says the country name and the Logic App is created automatically.
 
 ---
 
