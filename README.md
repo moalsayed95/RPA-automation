@@ -450,3 +450,25 @@ Deploys a parameterized Logic App to Azure.
 | Copilot Studio "Name isn't valid" error | Wrong variable reference in Power Fx body | Use exact variable name from "Save user response as" (e.g., `Topic.TopicCountry` not `Topic.Country`) |
 | Copilot Studio timeout | Default timeout is 30s, cold start needs more | Set HTTP Request timeout to `120000` (120s) |
 | Copilot Studio body not sent | Using "Edit JSON" instead of "Edit formula" | Switch to **Edit formula** for Power Fx expressions with variables |
+
+---
+
+## FAQ
+
+**Can the agent ask for the resource group instead of hardcoding it?**
+Yes. Add a second Question node in Copilot Studio (save as `TopicResourceGroup`), then use `Topic.TopicResourceGroup` in the HTTP body instead of the hardcoded value. No code changes needed — the Function already accepts any resource group. Just make sure the Function's managed identity has Contributor on that RG (add it to `targetResourceGroups` and run `azd provision`).
+
+**Can I do the same for the subscription ID?**
+Not recommended. Subscription IDs are GUIDs that no user will type correctly in a chat, and the Function's identity needs Contributor on whatever subscription is passed — if someone types a wrong one, it just fails. Keep it hardcoded. If you have separate dev/prod subscriptions, create two topics or a dropdown choice instead.
+
+**What role do I need to run `azd up`?**
+**Owner** on the target subscription (or **Contributor + User Access Administrator**). This is because the Bicep creates RBAC role assignments for the Function's managed identity, which requires permission to manage access. This is a one-time setup — day-to-day usage goes through the Teams agent.
+
+**What role does a Teams user need to deploy a Logic App via the agent?**
+None. The Teams user authenticates to Microsoft 365, not Azure. The Copilot Studio agent calls the Azure Function via HTTP, and the Function's managed identity (which already has Contributor) performs the ARM deployment. Access control is managed at the Copilot Studio level — you choose which users/groups can see the agent.
+
+**Can I trace which user triggered a deployment?**
+Partially today. Copilot Studio Analytics shows conversation transcripts tied to Teams users, but the Azure Function logs only see Copilot Studio as the caller, not the individual. To get full traceability, add `requestedBy: User().Email` to the Copilot Studio HTTP body — the Function can then log and return the user's email with every deployment, all searchable in Application Insights.
+
+**Can I use Entra ID instead of a function key for authentication?**
+Yes. Enable **Easy Auth** (built-in Entra ID authentication) on the Function App and configure Copilot Studio to use OAuth 2.0 instead of a key in the URL. This eliminates shared secrets, uses token-based auth, and is the recommended approach for production. No code changes needed — it's a configuration on the Function App. The current function key approach is fine for the PoC.
