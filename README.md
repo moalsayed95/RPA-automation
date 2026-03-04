@@ -472,3 +472,18 @@ Partially today. Copilot Studio Analytics shows conversation transcripts tied to
 
 **Can I use Entra ID instead of a function key for authentication?**
 Yes. Enable **Easy Auth** (built-in Entra ID authentication) on the Function App and configure Copilot Studio to use OAuth 2.0 instead of a key in the URL. This eliminates shared secrets, uses token-based auth, and is the recommended approach for production. No code changes needed — it's a configuration on the Function App. The current function key approach is fine for the PoC.
+
+**What's the difference between Phase 1 and Phase 2?**
+Phase 1 (done) deploys a **blank Logic App** with managed identity — proves the pipeline works end-to-end. Phase 2 deploys a **fully configured Logic App** with an email trigger, Key Vault secret retrieval, UiPath authentication, and queue item creation — all parameterized per country.
+
+**What additional inputs does the agent need for Phase 2?**
+Beyond country and resource group, the agent will ask for: **shared mailbox** (e.g., `rpa-japan@contoso.com`), **mail folder** (e.g., `/invoices`), **UiPath queue name** (e.g., `invoices_emails_japan`), **UiPath folder path** (e.g., `Finance/HQ`), and **environment** (`DEV` or `PROD`). Key Vault name, UiPath tenant, and subscription ID stay hardcoded per environment.
+
+**What changes in the ARM template for Phase 2?**
+The current template creates an empty Logic App. Phase 2 needs a full workflow definition with 6 steps: email trigger → get Client ID from Key Vault → get Client Secret → authenticate to UiPath → parse token → create queue item. The best approach is to export the JSON Code View of one working Logic App from the customer and replace hardcoded values with ARM parameters.
+
+**What about API connections (Office 365, Key Vault)?**
+Logic App steps that access Office 365 (email trigger) and Key Vault (secret retrieval) require **API connections** — separate Azure resources that need OAuth consent. Two options: (A) **shared connections** — pre-create one per RG and have all Logic Apps reference them (simpler, recommended), or (B) **per-Logic-App connections** — ARM creates them, but a user must authorize OAuth after each deployment.
+
+**What do we need from the customer to build Phase 2?**
+Five things: (1) JSON export of one working Logic App (Code View from Azure Portal), (2) API connection strategy — shared or per-Logic-App, (3) Key Vault secret naming convention (e.g., `UiPathClientId-DEV` vs `UiPathClientId`), (4) UiPath Cloud tenant name for Orchestrator URLs, (5) list of standard queue attributes per use case (e.g., MessageID, Subject — always the same or varies?).
