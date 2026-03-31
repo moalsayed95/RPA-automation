@@ -18,3 +18,7 @@ KEY_VAULT_RESOURCE_ID = os.getenv(
 # Built-in role definition ID for "Key Vault Secrets User"
 # This is a fixed Azure GUID: https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
 KEY_VAULT_SECRETS_USER_ROLE_ID = "4633458b-17de-408a-b874-0445c86b69e6"
+
+# Function App hostname (set automatically by Azure)
+# Used to build mock UiPath URLs when no real URL is provided
+FUNCTION_APP_HOSTNAME = os.getenv("WEBSITE_HOSTNAME", "localhost:7071")

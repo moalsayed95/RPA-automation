@@ -56,3 +56,49 @@ def deploy_logic_app(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500,
             mimetype="application/json"
         )
+
+
+# ──────────────────────────────────────────────
+# Mock UiPath endpoints — simulate UiPath Cloud
+# Orchestrator for demo purposes. Replace with
+# real UiPath URLs when going to production.
+# ──────────────────────────────────────────────
+
+@app.route(route="mock/uipath/auth", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def mock_uipath_auth(req: func.HttpRequest) -> func.HttpResponse:
+    """Mock UiPath authentication endpoint. Returns a fake bearer token."""
+    logging.info("Mock UiPath auth endpoint called.")
+    return func.HttpResponse(
+        json.dumps({
+            "access_token": "mock-bearer-token-for-demo-only",
+            "token_type": "Bearer",
+            "expires_in": 3600
+        }),
+        status_code=200,
+        mimetype="application/json"
+    )
+
+
+@app.route(route="mock/uipath/queue", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def mock_uipath_queue(req: func.HttpRequest) -> func.HttpResponse:
+    """Mock UiPath Add Queue Item endpoint. Accepts the payload and returns success."""
+    logging.info("Mock UiPath queue endpoint called.")
+
+    # Try to read the request body for realistic response
+    try:
+        body = req.get_json()
+        item_name = body.get("itemData", {}).get("Name", "Unknown")
+    except (ValueError, AttributeError):
+        item_name = "Unknown"
+
+    return func.HttpResponse(
+        json.dumps({
+            "Id": 12345,
+            "Status": "New",
+            "Priority": "Normal",
+            "Name": item_name,
+            "message": "Mock queue item created successfully"
+        }),
+        status_code=201,
+        mimetype="application/json"
+    )

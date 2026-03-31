@@ -14,6 +14,30 @@
       "metadata": {
         "description": "Location for the Logic App"
       }
+    },
+    "uipathAuthUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "UiPath authentication endpoint URL (mock or real)"
+      }
+    },
+    "uipathQueueUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "UiPath Add Queue Item endpoint URL (mock or real)"
+      }
+    },
+    "uipathFolderPath": {
+      "type": "string",
+      "metadata": {
+        "description": "UiPath folder path, e.g. Finance/HQ"
+      }
+    },
+    "queueItemName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name for the UiPath queue item, e.g. RPA-822: Invoices Emails"
+      }
     }
   },
   "resources": [
@@ -30,20 +54,147 @@
         "definition": {
           "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
           "contentVersion": "1.0.0.0",
-          "parameters": {},
+          "parameters": {
+            "uipathAuthUrl": {
+              "type": "String",
+              "defaultValue": "[parameters('uipathAuthUrl')]"
+            },
+            "uipathQueueUrl": {
+              "type": "String",
+              "defaultValue": "[parameters('uipathQueueUrl')]"
+            },
+            "uipathFolderPath": {
+              "type": "String",
+              "defaultValue": "[parameters('uipathFolderPath')]"
+            },
+            "queueItemName": {
+              "type": "String",
+              "defaultValue": "[parameters('queueItemName')]"
+            }
+          },
           "triggers": {
             "manual": {
               "type": "Request",
               "kind": "Http",
               "inputs": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "MessageId": {
+                      "type": "string"
+                    },
+                    "Subject": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["MessageId", "Subject"]
+                }
               }
             }
           },
-          "actions": {},
+          "actions": {
+            "Initialize_bearerToken": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "bearerToken",
+                    "type": "string",
+                    "value": ""
+                  }
+                ]
+              },
+              "runAfter": {}
+            },
+            "HTTP_Authenticate_UiPath": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "@{parameters('uipathAuthUrl')}",
+                "headers": {
+                  "Content-Type": "application/x-www-form-urlencoded"
+                },
+                "body": "grant_type=client_credentials&client_id=mock-client-id&client_secret=mock-client-secret&scope=OR.Queues"
+              },
+              "runAfter": {
+                "Initialize_bearerToken": ["Succeeded"]
+              }
+            },
+            "Parse_Auth_Response": {
+              "type": "ParseJson",
+              "inputs": {
+                "content": "@body('HTTP_Authenticate_UiPath')",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string"
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "HTTP_Authenticate_UiPath": ["Succeeded"]
+              }
+            },
+            "Set_bearerToken": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "bearerToken",
+                "value": "@body('Parse_Auth_Response')?['access_token']"
+              },
+              "runAfter": {
+                "Parse_Auth_Response": ["Succeeded"]
+              }
+            },
+            "HTTP_Add_Queue_Item": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "@{parameters('uipathQueueUrl')}",
+                "headers": {
+                  "Authorization": "Bearer @{variables('bearerToken')}",
+                  "Content-Type": "application/json",
+                  "X-UIPATH-FolderPath": "@{parameters('uipathFolderPath')}"
+                },
+                "body": {
+                  "itemData": {
+                    "Name": "@{parameters('queueItemName')}",
+                    "Priority": "Normal",
+                    "SpecificContent": {
+                      "MessageId": "@{triggerBody()?['MessageId']}",
+                      "Subject": "@{triggerBody()?['Subject']}"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Set_bearerToken": ["Succeeded"]
+              }
+            }
+          },
           "outputs": {}
         },
-        "parameters": {}
+        "parameters": {
+          "uipathAuthUrl": {
+            "value": "[parameters('uipathAuthUrl')]"
+          },
+          "uipathQueueUrl": {
+            "value": "[parameters('uipathQueueUrl')]"
+          },
+          "uipathFolderPath": {
+            "value": "[parameters('uipathFolderPath')]"
+          },
+          "queueItemName": {
+            "value": "[parameters('queueItemName')]"
+          }
+        }
       }
     }
   ],
@@ -59,6 +210,10 @@
     "principalId": {
       "type": "string",
       "value": "[reference(resourceId('Microsoft.Logic/workflows', parameters('logicAppName')), '2019-05-01', 'full').identity.principalId]"
+    },
+    "triggerUrl": {
+      "type": "string",
+      "value": "[listCallbackUrl(resourceId('Microsoft.Logic/workflows/triggers', parameters('logicAppName'), 'manual'), '2019-05-01').value]"
     }
   }
 }

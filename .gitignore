@@ -6,6 +6,7 @@ __pycache__/
 
 # Internal docs (not for public repo)
 vision.md
+phase2-plan.md
 venv/
 *.egg-info/
 

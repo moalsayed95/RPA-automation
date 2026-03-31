@@ -8,7 +8,7 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.authorization import AuthorizationManagementClient
 
-from .config import DEFAULT_LOCATION, KEY_VAULT_RESOURCE_ID, KEY_VAULT_SECRETS_USER_ROLE_ID
+from .config import DEFAULT_LOCATION, KEY_VAULT_RESOURCE_ID, KEY_VAULT_SECRETS_USER_ROLE_ID, FUNCTION_APP_HOSTNAME
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +52,21 @@ class LogicAppDeployer:
         with open(template_path, "r") as f:
             return json.load(f)
 
+    def _build_mock_url(self, path: str) -> str:
+        """Build a mock UiPath URL using the Function App's own hostname."""
+        return f"https://{FUNCTION_APP_HOSTNAME}/api/mock/uipath/{path}"
+
     def deploy(self, params: dict) -> dict:
         """
-        Deploy a blank Logic App to Azure.
+        Deploy a Logic App with UiPath workflow to Azure.
 
         Expects:
             - country: str
             - resourceGroup: str
             - subscriptionId: str
+            - uipathFolderPath: str (e.g. 'Finance/HQ')
+            - queueItemName: str (e.g. 'RPA-822: Invoices Emails')
+            - uipathEnvironment: str (optional, 'dev' or 'prod')
 
         Returns a dict with deployment status and resource details.
         """
@@ -80,10 +87,14 @@ class LogicAppDeployer:
         # Load template
         template = self._load_template()
 
-        # Build minimal parameters
+        # Build parameters for ARM template
         arm_parameters = {
             "logicAppName": {"value": logic_app_name},
             "location": {"value": location},
+            "uipathAuthUrl": {"value": params.get("uipathAuthUrl", self._build_mock_url("auth"))},
+            "uipathQueueUrl": {"value": params.get("uipathQueueUrl", self._build_mock_url("queue"))},
+            "uipathFolderPath": {"value": params.get("uipathFolderPath", "Finance/HQ")},
+            "queueItemName": {"value": params.get("queueItemName", "RPA-Queue-Item")},
         }
 
         # Generate a unique deployment name
@@ -117,6 +128,7 @@ class LogicAppDeployer:
         outputs = result.properties.outputs or {}
         resource_id = outputs.get("logicAppResourceId", {}).get("value", "")
         principal_id = outputs.get("principalId", {}).get("value", "")
+        trigger_url = outputs.get("triggerUrl", {}).get("value", "")
 
         # Assign Key Vault Secrets User role to the Logic App's managed identity
         role_assignment_status = "skipped"
@@ -142,11 +154,13 @@ class LogicAppDeployer:
             "resourceGroup": resource_group,
             "country": country,
             "portalUrl": portal_url,
+            "triggerUrl": trigger_url,
             "keyVaultRoleAssignment": role_assignment_status,
             "message": (
                 f"Logic App '{logic_app_name}' deployed successfully to "
                 f"resource group '{resource_group}'. "
                 f"Key Vault role assignment: {role_assignment_status}. "
+                f"Trigger URL: {trigger_url}. "
                 f"Validate here: {portal_url}"
             ),
         }
